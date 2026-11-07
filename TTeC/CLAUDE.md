@@ -16,7 +16,7 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele lê os sensores 
 - **`Serial` é exclusiva do GPS.** Nunca use `Serial.print` para depuração: o TX0 vai para o GPS. Todo log e toda telemetria saem por `Serial2`, e logs começam com `#` para não se misturarem ao CSV.
 - **O conector USB da placa não mostra a telemetria.** Ele está ligado à UART0, não à UART2.
 - **Desconecte o GPS do RX0 ao gravar o firmware.** A gravação usa a mesma UART0.
-- **Sem bloqueio na leitura do GPS.** Esvazie o buffer da UART a cada iteração do `loop()` para não perder sentenças NMEA.
+- **Sem bloqueio na leitura do GPS.** A tarefa do GPS esvazia o buffer da UART periodicamente para não perder sentenças NMEA.
 
 ## Objetivos
 
@@ -40,13 +40,15 @@ id,temp_c,press_hpa,hum_pct,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,mx_ut,my_ut,mz_u
 
 - O projeto precisa compilar na Arduino IDE. O arquivo `.ino` deve ter o mesmo nome da pasta do sketch.
 - Cada sensor tem uma classe própria, com arquivos `.h` e `.cpp` separados, responsável pela leitura e pelo armazenamento dos seus dados.
-- O `.ino` apenas orquestra: inicializa os módulos, agenda as leituras e chama a transmissão.
-- Pinos, endereços, baud rates e períodos de amostragem ficam centralizados em um único arquivo de configuração.
+- O `.ino` apenas orquestra: inicializa os módulos e inicia as tarefas FreeRTOS, definidas em `RtosTasks.h/.cpp`. A arquitetura está em `FREERTOS.md`.
+- Pinos, endereços, baud rates, períodos de amostragem, prioridades e pilhas ficam centralizados em um único arquivo de configuração.
 
 ## Política de código embarcado
 
 - **Memória:** sem alocação dinâmica depois do `setup()` e sem a classe `String`. Use buffers de tamanho fixo e `snprintf`.
-- **Temporização:** sem `delay()` no `loop()`. Agende as tarefas com `millis()`.
+- **Temporização:** sem `delay()` nas tarefas. Use `xTaskDelayUntil` para manter um período fixo.
+- **Concorrência:** cada módulo pertence a uma única tarefa. Os dados passam entre tarefas por `Mailbox`, o I2C é protegido por mutex e só a tarefa de telemetria usa `Serial2` depois do `setup()`.
+- **FreeRTOS:** tarefas, filas e mutexes usam alocação estática.
 - **Falhas:** a inicialização retorna `bool`. Um sensor ausente ou com falha é sinalizado na saída e não interrompe os demais.
 - **Validade dos dados:** cada módulo informa se a leitura atual é válida. Dados inválidos, como GPS sem fix, nunca são transmitidos como se fossem reais.
 - **Tipos:** use tipos de largura fixa (`uint8_t`, `int16_t`) e `constexpr` em vez de `#define` para constantes.

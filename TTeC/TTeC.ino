@@ -1,5 +1,6 @@
 // Firmware de leitura e telemetria de sensores para ESP32 DEVKIT V1.
 // Lê BME/BMP280, IMU MPU e GPS e transmite CSV pela UART2. Ver CLAUDE.md.
+// As leituras rodam em tarefas FreeRTOS, que já vem com o pacote esp32. Ver FREERTOS.md.
 //
 // Placa: "DOIT ESP32 DEVKIT V1" (pacote esp32 da Espressif)
 //
@@ -17,6 +18,7 @@
 #include "Gps.h"
 #include "Imu.h"
 #include "ProjectConfig.h"
+#include "RtosTasks.h"
 #include "Telemetry.h"
 
 namespace {
@@ -25,19 +27,7 @@ Barometer barometer;
 Imu imu;
 Gps gps(Serial);
 Telemetry telemetry(Serial2);
-
-uint32_t lastBarometerMs = 0;
-uint32_t lastImuMs = 0;
-uint32_t lastTelemetryMs = 0;
-bool gpsSilenceReported = false;
-
-bool isDue(uint32_t nowMs, uint32_t& lastMs, uint32_t periodMs) {
-  if (nowMs - lastMs < periodMs) {
-    return false;
-  }
-  lastMs = nowMs;
-  return true;
-}
+rtos::Modules modules{barometer, imu, gps, telemetry};
 
 void initBarometer() {
   if (barometer.begin()) {
@@ -72,26 +62,10 @@ void setup() {
   gps.begin();
 
   telemetry.sendHeader();
+  rtos::start(modules);
 }
 
 void loop() {
-  gps.poll();
-
-  const uint32_t nowMs = millis();
-
-  if (isDue(nowMs, lastBarometerMs, config::kBarometerPeriodMs)) {
-    barometer.sample();
-  }
-  if (isDue(nowMs, lastImuMs, config::kImuPeriodMs)) {
-    imu.sample();
-  }
-  if (isDue(nowMs, lastTelemetryMs, config::kTelemetryPeriodMs)) {
-    gps.sample();
-    telemetry.sendSample(barometer.data(), imu.data(), gps.data());
-  }
-
-  if (!gpsSilenceReported && nowMs >= config::kGpsNoDataTimeoutMs && !gps.hasReceivedData()) {
-    telemetry.log("gps sem dados: verificar ligacao e baud rate");
-    gpsSilenceReported = true;
-  }
+  // Todo o trabalho acontece nas tarefas: encerra a tarefa do Arduino e libera sua pilha
+  vTaskDelete(nullptr);
 }

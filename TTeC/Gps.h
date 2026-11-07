@@ -12,6 +12,7 @@ struct GpsData {
   bool positionValid = false;
   bool altitudeValid = false;
   bool satellitesValid = false;
+  bool dataReceived = false;  // Algum byte já chegou do GPS, mesmo sem fix
 };
 
 class Gps {
@@ -19,11 +20,10 @@ class Gps {
   explicit Gps(HardwareSerial& serial) : serial_(serial) {}
 
   void begin();
-  void poll();    // Esvazia o buffer da UART: chamar a cada iteração do loop()
+  void poll();    // Esvazia o buffer da UART: chamar periodicamente
   void sample();  // Atualiza data() com o estado atual do decodificador
 
   const GpsData& data() const { return data_; }
-  bool hasReceivedData() const { return parser_.charsProcessed() > 0; }
 
  private:
   HardwareSerial& serial_;

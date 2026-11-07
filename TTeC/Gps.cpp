@@ -14,6 +14,8 @@ void Gps::poll() {
 }
 
 void Gps::sample() {
+  data_.dataReceived = parser_.charsProcessed() > 0;
+
   // isValid() continua verdadeiro depois de perder o fix, por isso a idade é conferida
   data_.positionValid =
       parser_.location.isValid() && parser_.location.age() <= config::kGpsMaxDataAgeMs;
