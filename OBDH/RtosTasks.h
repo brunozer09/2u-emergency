@@ -1,9 +1,11 @@
 // Tarefas FreeRTOS do firmware. Arquitetura descrita em CLAUDE.md.
 #pragma once
 
+#include "Buzzer.h"
 #include "Console.h"
 #include "LineReceiver.h"
 #include "SdLogger.h"
+#include "StatusLed.h"
 
 namespace rtos {
 
@@ -12,6 +14,8 @@ struct Modules {
   LineReceiver& receiver;
   SdLogger& sdLogger;
   Console& console;
+  StatusLed& led;
+  Buzzer& buzzer;
 };
 
 // Inicia as tarefas. A partir daqui, cada módulo pertence à sua tarefa:

@@ -9,6 +9,8 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele recebe pela UART
 | Enlace com o TTeC | UART2 (`Serial2`) | RX2 = GPIO16, TX2 = GPIO17 | 115200 baud. Ligação cruzada: TX2 do TTeC no RX2 do OBDH, e vice-versa |
 | Módulo de cartão SD | SPI (VSPI) | CS 5, SCK 18, MISO 19, MOSI 23 | Cartão FAT32. Alimentar conforme o módulo: 5 V se tiver regulador, 3,3 V se não tiver |
 | Log de estado | UART0 (`Serial`) | Conector USB da placa | 115200 baud |
+| LED de atividade | GPIO | GPIO2 | Mesmo pino do LED da placa. LED externo: resistor em série, com o cátodo no GND |
+| Buzzer de erro | GPIO | GPIO15 | Ativo por padrão. Para buzzer passivo, use `kBuzzerIsPassive = true` |
 
 ## Restrições do hardware
 
@@ -16,11 +18,14 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele recebe pela UART
 - **O enlace não tem checksum.** Um erro que preserve o formato da linha não é detectado.
 - **O OBDH ainda não transmite ao TTeC.** O TX2 fica reservado.
 - **O cartão pode demorar.** Gravações podem levar centenas de milissegundos, por isso recepção e gravação são tarefas separadas.
+- **GPIO2 e GPIO15 são pinos de boot.** O GPIO2 precisa ficar em nível baixo ou solto durante a gravação do firmware, então nada externo pode puxá-lo para 3,3 V. O GPIO15 pode gerar um som breve ao ligar, antes do `setup()`.
+- **O GPIO não alimenta o buzzer diretamente, salvo se ele consumir menos de 12 mA.** Buzzers maiores precisam de um módulo ou transistor.
 
 ## Objetivos
 
 1. Receber as linhas do TTeC sem perder dados enquanto o cartão estiver ocupado.
 2. Gravar as linhas no cartão SD, sem corromper as que já foram salvas se o sistema falhar.
+3. Sinalizar o funcionamento: o LED pisca a cada linha válida recebida e o buzzer bipa quando ocorre um erro.
 
 ## Formato dos arquivos
 
@@ -37,11 +42,20 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele recebe pela UART
 
 | Tarefa | Prioridade | Função |
 |---|---|---|
-| `receiver` | 3 | Monta e valida as linhas da UART e as coloca na fila. Nunca espera pelo SD |
+| `receiver` | 4 | Monta e valida as linhas da UART e as coloca na fila. Nunca espera pelo SD |
+| `indicators` | 3 | Observa as estatísticas e controla o LED e o buzzer |
 | `sd` | 2 | Retira linhas da fila, grava, faz o flush e remonta o cartão após falhas |
 | `status` | 1 | Envia estatísticas pela USB |
 
 Falhas do cartão não interrompem a recepção. A linha que falhou é regravada em um novo arquivo depois de remontar o cartão. Se a fila encher, linhas inteiras são perdidas e contadas, e aparecem como salto no id.
+
+## Sinalização
+
+- **LED:** pulso de `kLedBlinkMs` a cada linha válida (dados, logs ou cabeçalho). Linhas descartadas não piscam o LED. Linhas que chegam juntas, na mesma leitura de `kReceiverPollPeriodMs`, geram uma só piscada.
+- **Buzzer:** um bipe de `kBuzzerBeepMs` quando aumenta qualquer contador de erro: linha inválida, linha longa demais, linha perdida por fila cheia, falha de gravação ou falha de montagem.
+- **Intervalo mínimo:** no máximo um bipe a cada `kBuzzerMinIntervalMs`. Erros nesse intervalo geram um único bipe ao final dele.
+- **Sem cartão:** cada tentativa de montagem falha e gera um bipe, portanto o alarme se repete a cada `kSdRetryPeriodMs` até o cartão voltar.
+- **Novos erros:** some o contador novo ao total em `indicatorTask`, em `RtosTasks.cpp`.
 
 ## Estrutura do código
 

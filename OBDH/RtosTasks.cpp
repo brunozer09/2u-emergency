@@ -21,6 +21,11 @@ static_assert(config::kSdIdleWaitMs < config::kStatsMaxAgeMs, "Espera do SD");
 static_assert(config::kSdRetryPeriodMs < config::kStatsMaxAgeMs, "Espera entre remontagens");
 static_assert(config::kReceiverPollPeriodMs < config::kStatsMaxAgeMs, "Período da recepção");
 
+// Os pulsos só têm a duração configurada se forem mais longos que o período da tarefa
+static_assert(config::kIndicatorPeriodMs < config::kLedBlinkMs, "Pulso do LED");
+static_assert(config::kIndicatorPeriodMs < config::kBuzzerBeepMs, "Duração do bipe");
+static_assert(config::kBuzzerBeepMs < config::kBuzzerMinIntervalMs, "Intervalo entre bipes");
+
 template <uint32_t StackBytes>
 struct TaskSlot {
   StaticTask_t control;
@@ -40,6 +45,7 @@ struct TaskSlot {
 };
 
 TaskSlot<config::kReceiverTaskStackBytes> receiverSlot;
+TaskSlot<config::kIndicatorTaskStackBytes> indicatorSlot;
 TaskSlot<config::kSdTaskStackBytes> sdSlot;
 TaskSlot<config::kStatusTaskStackBytes> statusSlot;
 
@@ -97,6 +103,41 @@ void sdTask(void* argument) {
   }
 }
 
+// Observa as estatísticas e não interfere nas outras tarefas: LED e buzzer nunca
+// atrasam a recepção ou a gravação.
+void indicatorTask(void* argument) {
+  Modules& modules = *static_cast<Modules*>(argument);
+  StatusLed& led = modules.led;
+  Buzzer& buzzer = modules.buzzer;
+  const TickType_t period = pdMS_TO_TICKS(config::kIndicatorPeriodMs);
+  TickType_t lastWake = xTaskGetTickCount();
+  uint32_t lastAccepted = 0;
+  uint32_t lastErrors = 0;
+
+  for (;;) {
+    // Sem limite de idade: os contadores só podem ser comparados com o valor real,
+    // e uma leitura zerada por idade pareceria um novo evento ao voltar
+    const ReceiverStats receiver = receiverStatsMailbox.readFresh(portMAX_DELAY);
+    const SdStats sd = sdStatsMailbox.readFresh(portMAX_DELAY);
+
+    if (receiver.accepted != lastAccepted) {
+      lastAccepted = receiver.accepted;
+      led.blink();
+    }
+
+    const uint32_t errors = receiver.malformed + receiver.tooLong + receiver.dropped +
+                            sd.failures + sd.mountFailures;
+    if (errors != lastErrors) {
+      lastErrors = errors;
+      buzzer.requestBeep();
+    }
+
+    led.update();
+    buzzer.update();
+    xTaskDelayUntil(&lastWake, period);
+  }
+}
+
 // Única tarefa que usa Serial depois do setup()
 void statusTask(void* argument) {
   Console& console = static_cast<Modules*>(argument)->console;
@@ -115,11 +156,13 @@ void statusTask(void* argument) {
                 static_cast<unsigned long>(receiver.malformed),
                 static_cast<unsigned long>(receiver.tooLong),
                 static_cast<unsigned long>(receiver.dropped));
-    console.log("sd: %s, arquivo=%u, gravadas=%lu, falhas=%lu", sd.ready ? "ok" : "FALHA",
-                static_cast<unsigned int>(sd.fileIndex),
+    console.log("sd: %s, arquivo=%u, gravadas=%lu, falhas=%lu, montagens_falhas=%lu",
+                sd.ready ? "ok" : "FALHA", static_cast<unsigned int>(sd.fileIndex),
                 static_cast<unsigned long>(sd.linesWritten),
-                static_cast<unsigned long>(sd.failures));
-    console.log("pilha livre (bytes): rx=%u sd=%u status=%u", receiverSlot.stackFreeBytes(),
+                static_cast<unsigned long>(sd.failures),
+                static_cast<unsigned long>(sd.mountFailures));
+    console.log("pilha livre (bytes): rx=%u indicadores=%u sd=%u status=%u",
+                receiverSlot.stackFreeBytes(), indicatorSlot.stackFreeBytes(),
                 sdSlot.stackFreeBytes(), statusSlot.stackFreeBytes());
   }
 }
@@ -133,6 +176,7 @@ void start(Modules& modules) {
                                  &lineQueueControl);
 
   receiverSlot.start("receiver", receiverTask, &modules, config::kReceiverTaskPriority);
+  indicatorSlot.start("indicators", indicatorTask, &modules, config::kIndicatorTaskPriority);
   sdSlot.start("sd", sdTask, &modules, config::kSdTaskPriority);
   statusSlot.start("status", statusTask, &modules, config::kStatusTaskPriority);
 }

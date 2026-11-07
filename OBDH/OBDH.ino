@@ -6,22 +6,30 @@
 //
 // Bibliotecas: SD e SPI, incluídas no pacote esp32. Nada a instalar.
 
+#include "Buzzer.h"
 #include "Console.h"
 #include "LineReceiver.h"
 #include "ProjectConfig.h"
 #include "RtosTasks.h"
 #include "SdLogger.h"
+#include "StatusLed.h"
 
 namespace {
 
 Console console(Serial);
 LineReceiver receiver(Serial2);
 SdLogger sdLogger;
-rtos::Modules modules{receiver, sdLogger, console};
+StatusLed led;
+Buzzer buzzer;
+rtos::Modules modules{receiver, sdLogger, console, led, buzzer};
 
 }  // namespace
 
 void setup() {
+  // Primeiro de tudo: define o nível dos pinos de boot o quanto antes
+  led.begin();
+  buzzer.begin();
+
   console.begin();
   console.log("inicializando");
 

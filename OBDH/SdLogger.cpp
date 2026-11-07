@@ -31,6 +31,9 @@ bool SdLogger::begin() {
   SPI.begin(config::kSdSckPin, config::kSdMisoPin, config::kSdMosiPin, config::kSdCsPin);
   stats_.ready = SD.begin(config::kSdCsPin, SPI, config::kSdClockHz, config::kSdMountPoint,
                           config::kSdMaxOpenFiles);
+  if (!stats_.ready) {
+    ++stats_.mountFailures;
+  }
   return stats_.ready;
 }
 

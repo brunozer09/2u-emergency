@@ -43,16 +43,29 @@ constexpr uint32_t kStatusPeriodMs = 10000;
 constexpr uint32_t kStatsMaxAgeMs = 5000;  // Estatística mais antiga que isso aparece zerada
 constexpr uint32_t kReceiverPollPeriodMs = 10;
 
+// Interface humana. GPIO2 e GPIO15 são pinos de boot: ver as restrições em CLAUDE.md.
+constexpr int kLedPin = 2;  // Mesmo pino do LED da placa
+constexpr uint32_t kLedBlinkMs = 30;  // Curto o bastante para separar linhas a 10 Hz
+constexpr int kBuzzerPin = 15;
+constexpr bool kBuzzerIsPassive = false;  // true para buzzer sem oscilador interno
+constexpr uint32_t kBuzzerToneHz = 2000;  // Usado apenas pelo buzzer passivo
+constexpr uint32_t kBuzzerBeepMs = 100;
+constexpr uint32_t kBuzzerMinIntervalMs = 1000;
+constexpr uint32_t kIndicatorPeriodMs = 10;
+
 // Tarefas FreeRTOS. Sem Wi-Fi ou Bluetooth, todas ficam no núcleo do Arduino.
 constexpr int kTaskCore = 1;
 
-// Maior número = mais urgente. A recepção vem primeiro para o SD nunca atrasá-la.
-constexpr uint32_t kReceiverTaskPriority = 3;
+// Maior número = mais urgente. A recepção vem primeiro para o SD nunca atrasá-la, e os
+// indicadores ficam acima do SD para um cartão lento não alongar o bipe.
+constexpr uint32_t kReceiverTaskPriority = 4;
+constexpr uint32_t kIndicatorTaskPriority = 3;
 constexpr uint32_t kSdTaskPriority = 2;
 constexpr uint32_t kStatusTaskPriority = 1;
 
 // Pilhas com folga: conferir no hardware com o log "pilha livre" antes de reduzir
 constexpr uint32_t kReceiverTaskStackBytes = 3072;
+constexpr uint32_t kIndicatorTaskStackBytes = 3072;
 constexpr uint32_t kSdTaskStackBytes = 6144;
 constexpr uint32_t kStatusTaskStackBytes = 3072;
 

@@ -9,6 +9,7 @@
 struct SdStats {
   uint32_t linesWritten = 0;
   uint32_t failures = 0;  // Erros de gravação que exigiram remontar o cartão
+  uint32_t mountFailures = 0;  // Tentativas de montagem sem sucesso
   uint16_t fileIndex = 0;
   bool ready = false;
 };
