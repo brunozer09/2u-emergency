@@ -15,8 +15,8 @@ constexpr uint16_t kLinkRxBufferBytes = 2048;
 // Formato de linha do TTeC. Precisa ser igual ao definido em TTeC/Telemetry.cpp.
 constexpr char kCsvHeader[] =
     "id,temp_c,press_hpa,hum_pct,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,"
-    "mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats";
-constexpr uint8_t kCsvColumns = 17;
+    "mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats,bat_v,bat_ma,bat_mw";
+constexpr uint8_t kCsvColumns = 20;
 constexpr size_t kLineBytes = 192;  // Mesmo limite do TTeC, com o terminador
 
 // Cartão SD no barramento VSPI

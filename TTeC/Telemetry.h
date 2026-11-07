@@ -4,6 +4,7 @@
 #include <Arduino.h>
 
 #include "Barometer.h"
+#include "BatteryMonitor.h"
 #include "Gps.h"
 #include "Imu.h"
 
@@ -13,11 +14,13 @@ class Telemetry {
 
   void begin();
   void sendHeader();
-  void sendSample(const BarometerData& barometer, const ImuData& imu, const GpsData& gps);
+  void sendSample(const BarometerData& barometer, const ImuData& imu, const GpsData& gps,
+                  const BatteryData& battery);
   void log(const char* format, ...) __attribute__((format(printf, 2, 3)));
 
  private:
-  // Maior linha possível: cerca de 145 caracteres com todos os campos preenchidos
+  // Maior linha possível: cerca de 170 caracteres com todos os campos preenchidos.
+  // O receptor OBDH usa o mesmo limite.
   static constexpr size_t kLineBytes = 192;
   static constexpr size_t kLogBytes = 96;
 

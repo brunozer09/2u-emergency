@@ -8,6 +8,7 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele lê os sensores 
 |---|---|---|---|
 | BME/BMP280 (barômetro) | I2C | SDA 21, SCL 22 | Endereço 0x76 ou 0x77. Chip ID: BMP280 = 0x58, BME280 = 0x60 (só o BME mede umidade) |
 | MPU 9265 (IMU) | I2C | SDA 21, SCL 22 | Endereço 0x68 ou 0x69. Confirmar o chip real lendo o `WHO_AM_I` |
+| INA219 (bateria) | I2C | SDA 21, SCL 22 | Endereço 0x40 (padrão). Shunt de 0,1 ohm. Ligação em série no positivo: bateria no VIN+, carga no VIN-, com GND comum |
 | GY-GPS6MV2 (GPS) | UART0 (`Serial`) | RX0 = GPIO3, TX0 = GPIO1 | Baud padrão 9600, envia NMEA a 1 Hz |
 | Saída de telemetria | UART2 (`Serial2`) | RX2 = GPIO16, TX2 = GPIO17 | Para ler no PC, usar um adaptador USB-UART de 3,3 V |
 
@@ -16,6 +17,7 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele lê os sensores 
 - **`Serial` é exclusiva do GPS.** Nunca use `Serial.print` para depuração: o TX0 vai para o GPS. Todo log e toda telemetria saem por `Serial2`, e logs começam com `#` para não se misturarem ao CSV.
 - **O conector USB da placa não mostra a telemetria.** Ele está ligado à UART0, não à UART2.
 - **Desconecte o GPS do RX0 ao gravar o firmware.** A gravação usa a mesma UART0.
+- **Limites do INA219.** Até 26 V no barramento e ±3,2 A com o shunt de 0,1 ohm. Acima de 3,2 A, os três campos de bateria saem vazios, pois a tensão também depende do shunt.
 - **Sem bloqueio na leitura do GPS.** A tarefa do GPS esvazia o buffer da UART periodicamente para não perder sentenças NMEA.
 
 ## Objetivos
@@ -28,13 +30,29 @@ Firmware para ESP32 DEVKIT V1, desenvolvido na Arduino IDE. Ele lê os sensores 
 Cada linha contém as leituras atuais dos sensores, precedidas por um id sequencial para depuração. O cabeçalho é enviado uma vez, após a inicialização:
 
 ```csv
-id,temp_c,press_hpa,hum_pct,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats
+id,temp_c,press_hpa,hum_pct,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats,bat_v,bat_ma,bat_mw
 ```
 
 - **`id`:** `uint32_t` que começa em 0 e aumenta 1 a cada linha transmitida. Saltos indicam linhas perdidas, e a volta a 0 indica reinício do firmware.
 - **Dados inválidos:** campo vazio, mantendo todas as vírgulas (por exemplo, `hum_pct` no BMP280 ou a posição sem fix do GPS). Nunca use `0` ou o último valor válido.
 - **Números:** ponto como separador decimal e casas decimais fixas por campo.
 - **Linha:** termina em `\n` e é montada por inteiro em um buffer fixo antes do envio.
+- **Bateria:** `bat_v` é a tensão nos terminais, `bat_ma` é positiva na descarga e negativa na carga, e `bat_mw` é o produto das duas.
+- **Compatibilidade com o OBDH:** ao mudar colunas, atualize também `kCsvHeader` e `kCsvColumns` em `../OBDH/ProjectConfig.h` e grave as duas placas. O OBDH rejeita linhas fora desse formato.
+
+## Saúde da bateria
+
+O estado é avaliado a cada leitura e enviado como log `#` somente quando muda, por exemplo `# bateria BAIXA: 3.48 V`.
+
+| Estado | Condição |
+|---|---|
+| `ok` | Tensão igual ou acima de `kBatteryLowV` |
+| `BAIXA` | Tensão abaixo de `kBatteryLowV` |
+| `CRITICA` | Tensão abaixo de `kBatteryCriticalV` |
+
+- **Histerese:** para sair de um estado, a tensão precisa superar o limite em `kBatteryHysteresisV`.
+- **Limites:** os valores em `ProjectConfig.h` assumem uma célula de Li-ion/LiPo e precisam corresponder à bateria real.
+- **Alcance:** o estado reflete a tensão no instante da leitura, sob carga. Não mede capacidade restante nem desgaste da bateria.
 
 ## Estrutura do código
 

@@ -14,6 +14,7 @@ namespace {
 // Uma leitura precisa poder ser republicada antes de ser considerada antiga
 static_assert(config::kBarometerPeriodMs < config::kSampleMaxAgeMs, "Período do barômetro");
 static_assert(config::kImuPeriodMs < config::kSampleMaxAgeMs, "Período da IMU");
+static_assert(config::kBatteryPeriodMs < config::kSampleMaxAgeMs, "Período da bateria");
 static_assert(config::kGpsPollPeriodMs < config::kSampleMaxAgeMs, "Período do GPS");
 
 // O buffer da UART precisa aguentar os bytes que chegam entre duas leituras (10 bits por byte)
@@ -41,11 +42,13 @@ struct TaskSlot {
 TaskSlot<config::kGpsTaskStackBytes> gpsSlot;
 TaskSlot<config::kImuTaskStackBytes> imuSlot;
 TaskSlot<config::kBarometerTaskStackBytes> barometerSlot;
+TaskSlot<config::kBatteryTaskStackBytes> batterySlot;
 TaskSlot<config::kTelemetryTaskStackBytes> telemetrySlot;
 
 Mailbox<GpsData> gpsMailbox;
 Mailbox<ImuData> imuMailbox;
 Mailbox<BarometerData> barometerMailbox;
+Mailbox<BatteryData> batteryMailbox;
 
 // Wire protege cada transação, mas uma leitura de sensor é uma sequência delas
 SemaphoreHandle_t i2cMutex = nullptr;
@@ -79,6 +82,11 @@ void imuTask(void* argument) {
   runI2cSensor(modules.imu, imuMailbox, config::kImuPeriodMs);
 }
 
+void batteryTask(void* argument) {
+  Modules& modules = *static_cast<Modules*>(argument);
+  runI2cSensor(modules.batteryMonitor, batteryMailbox, config::kBatteryPeriodMs);
+}
+
 void gpsTask(void* argument) {
   Gps& gps = static_cast<Modules*>(argument)->gps;
   const TickType_t period = pdMS_TO_TICKS(config::kGpsPollPeriodMs);
@@ -92,6 +100,19 @@ void gpsTask(void* argument) {
   }
 }
 
+const char* batteryStateName(BatteryState state) {
+  switch (state) {
+    case BatteryState::kOk:
+      return "ok";
+    case BatteryState::kLow:
+      return "BAIXA";
+    case BatteryState::kCritical:
+      return "CRITICA";
+    default:
+      return "desconhecida";
+  }
+}
+
 // Única tarefa que usa Serial2 depois do setup(), o que evita linhas misturadas
 void telemetryTask(void* argument) {
   Telemetry& telemetry = static_cast<Modules*>(argument)->telemetry;
@@ -101,12 +122,22 @@ void telemetryTask(void* argument) {
   TickType_t lastWake = xTaskGetTickCount();
   TickType_t lastStackReport = lastWake;
   bool gpsSilenceReported = false;
+  BatteryState reportedBatteryState = BatteryState::kUnknown;
 
   for (;;) {
     xTaskDelayUntil(&lastWake, period);
 
     const GpsData gps = gpsMailbox.readFresh(maxAge);
-    telemetry.sendSample(barometerMailbox.readFresh(maxAge), imuMailbox.readFresh(maxAge), gps);
+    const BatteryData battery = batteryMailbox.readFresh(maxAge);
+    telemetry.sendSample(barometerMailbox.readFresh(maxAge), imuMailbox.readFresh(maxAge), gps,
+                         battery);
+
+    // Estado desconhecido não é aviso: os campos vazios já indicam a falha do sensor
+    if (battery.state != BatteryState::kUnknown && battery.state != reportedBatteryState) {
+      reportedBatteryState = battery.state;
+      telemetry.log("bateria %s: %.2f V", batteryStateName(battery.state),
+                    static_cast<double>(battery.voltageV));
+    }
 
     if (!gpsSilenceReported && !gps.dataReceived && millis() >= config::kGpsNoDataTimeoutMs) {
       telemetry.log("gps sem dados: verificar ligacao e baud rate");
@@ -115,9 +146,10 @@ void telemetryTask(void* argument) {
 
     if (lastWake - lastStackReport >= stackReportPeriod) {
       lastStackReport = lastWake;
-      telemetry.log("pilha livre (bytes): gps=%u imu=%u baro=%u telemetria=%u",
+      telemetry.log("pilha livre (bytes): gps=%u imu=%u baro=%u bat=%u telemetria=%u",
                     gpsSlot.stackFreeBytes(), imuSlot.stackFreeBytes(),
-                    barometerSlot.stackFreeBytes(), telemetrySlot.stackFreeBytes());
+                    barometerSlot.stackFreeBytes(), batterySlot.stackFreeBytes(),
+                    telemetrySlot.stackFreeBytes());
     }
   }
 }
@@ -128,11 +160,13 @@ void start(Modules& modules) {
   gpsMailbox.begin();
   imuMailbox.begin();
   barometerMailbox.begin();
+  batteryMailbox.begin();
   i2cMutex = xSemaphoreCreateMutexStatic(&i2cMutexControl);
 
   gpsSlot.start("gps", gpsTask, &modules, config::kGpsTaskPriority);
   imuSlot.start("imu", imuTask, &modules, config::kImuTaskPriority);
   barometerSlot.start("baro", barometerTask, &modules, config::kBarometerTaskPriority);
+  batterySlot.start("bat", batteryTask, &modules, config::kBatteryTaskPriority);
   telemetrySlot.start("telemetry", telemetryTask, &modules, config::kTelemetryTaskPriority);
 }
 

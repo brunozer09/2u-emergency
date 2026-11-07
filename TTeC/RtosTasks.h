@@ -2,6 +2,7 @@
 #pragma once
 
 #include "Barometer.h"
+#include "BatteryMonitor.h"
 #include "Gps.h"
 #include "Imu.h"
 #include "Telemetry.h"
@@ -13,6 +14,7 @@ struct Modules {
   Barometer& barometer;
   Imu& imu;
   Gps& gps;
+  BatteryMonitor& batteryMonitor;
   Telemetry& telemetry;
 };
 

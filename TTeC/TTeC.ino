@@ -1,5 +1,5 @@
 // Firmware de leitura e telemetria de sensores para ESP32 DEVKIT V1.
-// Lê BME/BMP280, IMU MPU e GPS e transmite CSV pela UART2. Ver CLAUDE.md.
+// Lê BME/BMP280, IMU MPU, GPS e INA219 e transmite CSV pela UART2. Ver CLAUDE.md.
 // As leituras rodam em tarefas FreeRTOS, que já vem com o pacote esp32. Ver FREERTOS.md.
 //
 // Placa: "DOIT ESP32 DEVKIT V1" (pacote esp32 da Espressif)
@@ -8,6 +8,7 @@
 //   - TinyGPSPlus, de Mikal Hart
 //   - Adafruit BMP280 Library
 //   - Adafruit BME280 Library
+//   - Adafruit INA219
 //   - Adafruit Unified Sensor e Adafruit BusIO (dependências das anteriores)
 //
 // ATENÇÃO: desconecte o GPS do RX0 antes de gravar o firmware.
@@ -15,6 +16,7 @@
 #include <Wire.h>
 
 #include "Barometer.h"
+#include "BatteryMonitor.h"
 #include "Gps.h"
 #include "Imu.h"
 #include "ProjectConfig.h"
@@ -26,8 +28,9 @@ namespace {
 Barometer barometer;
 Imu imu;
 Gps gps(Serial);
+BatteryMonitor batteryMonitor;
 Telemetry telemetry(Serial2);
-rtos::Modules modules{barometer, imu, gps, telemetry};
+rtos::Modules modules{barometer, imu, gps, batteryMonitor, telemetry};
 
 void initBarometer() {
   if (barometer.begin()) {
@@ -48,6 +51,11 @@ void initImu() {
                 imu.whoAmI(), imu.magPresent() ? "ok" : "ausente");
 }
 
+void initBatteryMonitor() {
+  telemetry.log("bateria (INA219) %s: endereco 0x%02X",
+                batteryMonitor.begin() ? "ok" : "FALHOU", config::kBatteryMonitorAddress);
+}
+
 }  // namespace
 
 void setup() {
@@ -59,6 +67,7 @@ void setup() {
 
   initBarometer();
   initImu();
+  initBatteryMonitor();
   gps.begin();
 
   telemetry.sendHeader();

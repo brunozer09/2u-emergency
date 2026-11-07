@@ -8,7 +8,7 @@
 namespace {
 constexpr char kHeader[] =
     "id,temp_c,press_hpa,hum_pct,ax_g,ay_g,az_g,gx_dps,gy_dps,gz_dps,"
-    "mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats\n";
+    "mx_ut,my_ut,mz_ut,lat_deg,lon_deg,alt_m,sats,bat_v,bat_ma,bat_mw\n";
 
 constexpr uint8_t kAxes = 3;
 constexpr uint8_t kDecimalsEnvironment = 2;
@@ -17,6 +17,9 @@ constexpr uint8_t kDecimalsGyro = 2;
 constexpr uint8_t kDecimalsMag = 1;
 constexpr uint8_t kDecimalsCoordinate = 6;
 constexpr uint8_t kDecimalsAltitude = 1;
+constexpr uint8_t kDecimalsBatteryVoltage = 3;
+constexpr uint8_t kDecimalsBatteryCurrent = 1;
+constexpr uint8_t kDecimalsBatteryPower = 1;
 }  // namespace
 
 void Telemetry::begin() {
@@ -30,7 +33,7 @@ void Telemetry::sendHeader() {
 }
 
 void Telemetry::sendSample(const BarometerData& barometer, const ImuData& imu,
-                           const GpsData& gps) {
+                           const GpsData& gps, const BatteryData& battery) {
   lineLength_ = 0;
   lineOverflow_ = false;
 
@@ -56,6 +59,10 @@ void Telemetry::sendSample(const BarometerData& barometer, const ImuData& imu,
   appendFloat(gps.longitudeDeg, kDecimalsCoordinate, gps.positionValid);
   appendFloat(gps.altitudeM, kDecimalsAltitude, gps.altitudeValid);
   appendUint(gps.satellites, gps.satellitesValid);
+
+  appendFloat(battery.voltageV, kDecimalsBatteryVoltage, battery.voltageValid);
+  appendFloat(battery.currentMa, kDecimalsBatteryCurrent, battery.currentValid);
+  appendFloat(battery.powerMw, kDecimalsBatteryPower, battery.powerValid);
 
   appendFormatted("\n");
 

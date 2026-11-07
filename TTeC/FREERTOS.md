@@ -14,14 +14,17 @@ Compilado com o pacote esp32 3.3.11. O formato do CSV e a ligação elétrica n�
                │                         │
           mutex I2C                      │
                │                         │
- Tarefa baro ──┴───► barometerMailbox ───┘
+ Tarefa baro ──┼───► barometerMailbox ───┤
+               │                         │
+ Tarefa bat  ──┴───► batteryMailbox ─────┘
 ```
 
 | Tarefa | Prioridade | Período | Pilha | Função |
 |---|---|---|---|---|
-| `gps` | 4 | 50 ms | 3072 bytes | Esvazia a UART, decodifica NMEA e publica |
-| `imu` | 3 | 100 ms | 3072 bytes | Lê a IMU com o mutex I2C e publica |
-| `baro` | 2 | 100 ms | 3072 bytes | Lê o barômetro com o mutex I2C e publica |
+| `gps` | 5 | 50 ms | 3072 bytes | Esvazia a UART, decodifica NMEA e publica |
+| `imu` | 4 | 100 ms | 3072 bytes | Lê a IMU com o mutex I2C e publica |
+| `baro` | 3 | 100 ms | 3072 bytes | Lê o barômetro com o mutex I2C e publica |
+| `bat` | 2 | 200 ms | 3072 bytes | Lê o INA219 com o mutex I2C e publica |
 | `telemetry` | 1 | 100 ms | 4096 bytes | Monta e envia o CSV e os logs |
 
 Todos esses valores estão em `ProjectConfig.h`.
