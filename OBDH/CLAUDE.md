@@ -61,7 +61,7 @@ Falhas do cartão não interrompem a recepção. A linha que falhou é regravada
 
 - O projeto precisa compilar na Arduino IDE. O arquivo `.ino` deve ter o mesmo nome da pasta do sketch.
 - Cada módulo tem uma classe própria, com arquivos `.h` e `.cpp` separados.
-- O `.ino` apenas orquestra: inicializa os módulos e inicia as tarefas FreeRTOS, definidas em `RtosTasks.h/.cpp`.
+- O `.ino` apenas orquestra: inicializa os módulos e inicia as tarefas FreeRTOS, definidas em `RtosTasks.h/.cpp`. Os diagramas do sistema estão em `../ARQUITETURA.md`.
 - Pinos, baud rates, períodos, prioridades e pilhas ficam centralizados em `ProjectConfig.h`.
 - `Mailbox.h` é uma cópia do arquivo de mesmo nome do TTeC. Mantenha os dois iguais.
 

@@ -58,7 +58,7 @@ O estado é avaliado a cada leitura e enviado como log `#` somente quando muda, 
 
 - O projeto precisa compilar na Arduino IDE. O arquivo `.ino` deve ter o mesmo nome da pasta do sketch.
 - Cada sensor tem uma classe própria, com arquivos `.h` e `.cpp` separados, responsável pela leitura e pelo armazenamento dos seus dados.
-- O `.ino` apenas orquestra: inicializa os módulos e inicia as tarefas FreeRTOS, definidas em `RtosTasks.h/.cpp`. A arquitetura está em `FREERTOS.md`.
+- O `.ino` apenas orquestra: inicializa os módulos e inicia as tarefas FreeRTOS, definidas em `RtosTasks.h/.cpp`. A arquitetura das tarefas está em `FREERTOS.md`, e os diagramas do sistema em `../ARQUITETURA.md`.
 - Pinos, endereços, baud rates, períodos de amostragem, prioridades e pilhas ficam centralizados em um único arquivo de configuração.
 
 ## Política de código embarcado
