@@ -6,19 +6,18 @@ Visão geral das placas e da estrutura de software de cada firmware. Os diagrama
 
 ```mermaid
 flowchart LR
-    EPS["<b>EPS</b><br/>energia<br/><i>sem firmware no repositório</i>"]
+    EPS["<b>EPS</b><br/>energia<br/>"]
     TTeC["<b>TTeC</b><br/>sensores e telemetria<br/>pasta TTeC/"]
     OBDH["<b>OBDH</b><br/>registro em cartão SD<br/>pasta OBDH/"]
-    PAYLOAD["<b>PAYLOAD</b><br/>carga útil<br/><i>sem firmware no repositório</i>"]
+    PAYLOAD["<b>PAYLOAD</b><br/>carga útil<br/>"]
 
     TTeC == "UART2 · CSV a 10 Hz" ==> OBDH
     PAYLOAD -. "dados: interface a definir" .-> OBDH
-    EPS -. "alimentação: a definir" .-> TTeC
-    EPS -. "alimentação: a definir" .-> OBDH
-    EPS -. "alimentação: a definir" .-> PAYLOAD
+    EPS -. "alimentação" .-> TTeC
+    EPS -. "alimentação" .-> OBDH
+    EPS -. "alimentação" .-> PAYLOAD
 ```
 
-- **Linha grossa:** ligação implementada. **Tracejada:** ainda não definida no código.
 - **Bateria:** o INA219 que mede a bateria está ligado ao I2C do TTeC, e os dados chegam ao OBDH nas colunas `bat_v`, `bat_ma` e `bat_mw`.
 - **Portas livres no OBDH:** a UART2 recebe o TTeC e a UART0 é o console USB. Sobram a UART1 e o barramento SPI, que já é usado pelo cartão SD com CS no GPIO5. Definir as interfaces do EPS e do PAYLOAD exige escolher entre essas opções.
 
