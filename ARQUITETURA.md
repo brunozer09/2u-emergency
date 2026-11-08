@@ -12,7 +12,7 @@ flowchart LR
     PAYLOAD["<b>PAYLOAD</b><br/>carga útil<br/>"]
 
     TTeC == "UART2 · CSV a 10 Hz" ==> OBDH
-    PAYLOAD -. "dados: interface a definir" .-> OBDH
+    PAYLOAD -. "dados" .-> OBDH
     EPS -. "alimentação" .-> TTeC
     EPS -. "alimentação" .-> OBDH
     EPS -. "alimentação" .-> PAYLOAD
